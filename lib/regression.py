@@ -18,27 +18,38 @@ Wikipedia. (2022). Vandermonde matrix.
 
 Dr Christos Frantzidis. (October 3, 2023). Model selection & evaluation, University of Lincoln.
 [online] Available on Blackboard:
-    [] = slides 17 - 25 (/26)
+    [6] = slides 17 - 25 (/26)
+
+Wikipedia. (2022). Coefficient of Determination
+[online] Available at: https://en.wikipedia.org/wiki/Coefficient_of_determination#Definitions:
+    [7] = (top)
 '''
+
 from icecream import ic
 
 import numpy as np
 from typing import Callable
 
+from error import *
 
-# generates a distribution of an equation
+
+# generates a distribution 2d of an equation
 def generate_distribution(
     formula: Callable,
-    mu: int | float,
-    sigma: int | float,
-    number: int,
-    start: int | float,
-    end: int | float
+    mu     : int | float,
+    sigma  : int | float,
+    number : int,
+    start  : int | float,
+    end    : int | float,
+    input_v: bool = False,
+    shuffle: bool = False
     ) -> np.ndarray:
 
     rand_Y = np.random.normal(mu, sigma, number)
-    np.random.shuffle(rand_Y)
+    if shuffle: np.random.shuffle(rand_Y)
     linspace = np.linspace(start, end, number)
+
+    if not input_v: return formula(linspace) + rand_Y
 
     return np.array([linspace, formula(linspace) + rand_Y])
 
@@ -116,19 +127,15 @@ def simple_polynomial_regression(y: np.ndarray, x: np.ndarray, M: int) -> np.nda
     return w
 
 
-class MultilinearSingularError(ValueError):
-    def __init__(self, X: np.ndarray) -> None:
-        self.error_message = "Multilinear equation not found because X array is singular.\n" \
-                             "X = \n{0}".format(X)
-        super().__init__(self.error_message)
-
-
 def multilinear_regression(y: np.ndarray, X: np.ndarray) -> np.ndarray:
-    # there must be as many X and y data points
-    assert len(X) == len(y)
+    # there must be as many xn and y data points
+    # assert X.shape[1] == len(y)
     # if X is 1-D, force it to be 2-D
-    if len(X) == X.size:
-        X = X.resize(-1,1)
+    # if len(X) == X.size:
+    #     X = X.resize(-1,1)
+
+    # entirely the same as simple regression except we must prefix each
+    # level of X with 1 so that it aligns with y = ... + w0x0
 
     X = np.column_stack((np.ones(len(X)), X))
 
@@ -154,13 +161,27 @@ def make_regression_function(A: np.ndarray) -> Callable:
     return function
 
 
-# [] aka MAE, used to messure the error of a function
-def mean_absolute(y: np.ndarray, x: np.ndarray, regression_f: Callable) -> np.ndarray:
-    return np.abs(y - regression_f(x))
+# [6] aka MAE, used to messure the error of a function
+def mean_absolute(y: np.ndarray, x: np.ndarray, regression_f: Callable) -> float:
+    assert len(y) == len(x)
+    N = len(x)
+    return (1 / N) * np.abs(y - regression_f(x)).sum()
 
-# [] aka RMSE, used to messure the error of a function in terms of the dependant variable
-def root_mean_squared(y: np.ndarray, x: np.ndarray, regression_f: Callable) -> np.ndarray:
-    return (y - regression_f(x)) ** 2
+
+# [6] aka RMSE, used to messure the error of a function in terms of the dependant variable
+def root_mean_squared(y: np.ndarray, x: np.ndarray, regression_f: Callable) -> float:
+    assert len(y) == len(x)
+    N = len(x)
+    return np.sqrt((1 / N) * ((y - regression_f(x)) ** 2).sum())
+
+
+# [6] [7] aka RMSE, used to messure the error of a function in terms of the dependant variabl
+def R_squared(y: np.ndarray, x: np.ndarray, regression_f: Callable) -> float:
+    e = y - regression_f(x)
+    SSresidual = (e ** 2).sum()
+    SStotal = ((y - y.mean()) ** 2).sum()
+    return 1 - (SSresidual / SStotal)
+
 
 # applies an error function
 def model_error(y: np.ndarray, x: np.ndarray, regression_f: Callable, loss_f: Callable) -> float:
@@ -168,9 +189,4 @@ def model_error(y: np.ndarray, x: np.ndarray, regression_f: Callable, loss_f: Ca
     N = len(y)
     return (1 / N) * (loss_f(y, x, regression_f)).sum()
 
-#
 
-X = np.array([[4,7], [5,6], [6,5]])
-y = np.array([1,2,3])
-m = multilinear_regression(y, X)
-ic(m)
