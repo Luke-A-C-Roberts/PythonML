@@ -1,31 +1,4 @@
-'''
-references
-
-Rogers, Simon, and Mark Girolami. (2016). A First Course in Machine Learning, CRC Press LLC.
-[online] Available at https://ebookcentral-proquest-com.proxy.library.lincoln.ac.uk/lib/ulinc/reader.action?docID=4718644:
-    [0] = page 7
-    [2] = page 6
-    [3] = pages 9 - 12
-    [4] = pages 19 - 25
-
-Petra Bosilj. (September 26, 2023). Introduction to Machine Learning, University of Lincoln:
-[online] Available on Blackboard:
-    [1] = slide 26 (/30)
-
-Wikipedia. (2022). Vandermonde matrix.
-[online] Available at: https://en.wikipedia.org/wiki/Vandermonde_matrix#.
-    [5] = (top)
-
-Dr Christos Frantzidis. (October 3, 2023). Model selection & evaluation, University of Lincoln.
-[online] Available on Blackboard:
-    [6] = slides 17 - 25 (/26)
-
-Wikipedia. (2022). Coefficient of Determination
-[online] Available at: https://en.wikipedia.org/wiki/Coefficient_of_determination#Definitions:
-    [7] = (top)
-'''
-
-from icecream import ic
+'''REFERENCES AT THE BOTTOM OF THE PAGE'''
 
 import numpy as np
 from typing import Callable
@@ -35,7 +8,7 @@ from error import *
 
 # generates a distribution 2d of an equation
 def generate_distribution(
-    formula: Callable,
+    formula: Callable[[int | float], int | float],
     mu     : int | float,
     sigma  : int | float,
     number : int,
@@ -149,7 +122,10 @@ def multilinear_regression(y: np.ndarray, X: np.ndarray) -> np.ndarray:
 
 
 # converts the regression array into a linear model
-def make_regression_function(A: np.ndarray) -> Callable:
+def make_regression_function(
+    A: np.ndarray
+    ) -> Callable[[int | float | np.ndarray], float | np.ndarray]:
+
     # clossure function for regression line
     def function(x: int | float | np.ndarray) -> float | np.ndarray:
         if type(x) != np.ndarray:
@@ -162,31 +138,136 @@ def make_regression_function(A: np.ndarray) -> Callable:
 
 
 # [6] aka MAE, used to messure the error of a function
-def mean_absolute(y: np.ndarray, x: np.ndarray, regression_f: Callable) -> float:
+def mean_absolute_error(
+    y: np.ndarray,
+    x: np.ndarray,
+    regression_f: Callable[[int | float | np.ndarray], float | np.ndarray]
+    ) -> float:
+
     assert len(y) == len(x)
     N = len(x)
     return (1 / N) * np.abs(y - regression_f(x)).sum()
 
 
 # [6] aka RMSE, used to messure the error of a function in terms of the dependant variable
-def root_mean_squared(y: np.ndarray, x: np.ndarray, regression_f: Callable) -> float:
+def root_mean_squared_error(
+    y: np.ndarray,
+    x: np.ndarray,
+    regression_f: Callable[[int | float | np.ndarray], float | np.ndarray]
+    ) -> float:
+
     assert len(y) == len(x)
     N = len(x)
     return np.sqrt((1 / N) * ((y - regression_f(x)) ** 2).sum())
 
 
-# [6] [7] aka RMSE, used to messure the error of a function in terms of the dependant variabl
-def R_squared(y: np.ndarray, x: np.ndarray, regression_f: Callable) -> float:
+# [6] [7] how much variation from the independant variable is from the independant variable
+def R_squared(
+    y: np.ndarray,
+    x: np.ndarray,
+    regression_f: Callable[[int | float | np.ndarray], float | np.ndarray]
+    ) -> float:
+
     e = y - regression_f(x)
     SSresidual = (e ** 2).sum()
     SStotal = ((y - y.mean()) ** 2).sum()
     return 1 - (SSresidual / SStotal)
 
 
-# applies an error function
-def model_error(y: np.ndarray, x: np.ndarray, regression_f: Callable, loss_f: Callable) -> float:
-    assert len(y) == len(x)
-    N = len(y)
-    return (1 / N) * (loss_f(y, x, regression_f)).sum()
+# Makes a sigmoid function from a theta parameter vector for logistic regression
+def make_sigmoid(theta: np.ndarray) -> Callable[[int | float | np.ndarray], float | np.ndarray]:
+    def sigmoid(X: int | float | np.ndarray) -> float | np.ndarray:
+        B, W = theta[0], theta[1:]
+        assert len(W) == len(X)
+
+        WX = (-1 * W * X).sum()
+
+        return 1 / (1 + np.exp(-B - WX))
+
+    return sigmoid
 
 
+def logistic_regression(Y: np.ndarray, X: np.ndarray, I: int) -> np.array:
+    assert len(X) == len(Y)
+
+    # number of datapoints
+    (m, n) = X.shape
+
+    # [8] when predicting logistic regression we use the sigmoid function.
+    # hθ = p(y = 1|x;θ) = σ(dot(W, X) + B). where W is the vector of weights
+    # of our model and B is our bias.
+    #
+    # [9] We must set our bias and weight variables to zero
+    theta = np.zeros(shape=(n + 1), dtype=np.float64)
+
+    # to train logistic regression to be a better model, we use newton's method.
+    # to do this we evaluate how well the model catagorises the data using a cost function J(θ),
+    # then adjust the weights and bias to better fit the data.
+    # [10] Our cost function is:
+    # J(θ) = -1/m * Σ(yi log(hθ(xi)) + (1 - yi)log(1 - hθ(xi)))
+
+    # To adjust the weights, we find the argument mininum of J(θ) by finding the partial
+    # derivative and equating it to zero: d/dθ (J(θ)) = f(θ) = 0
+    # however unlike polynomial regression we can't find the exact argmin(θ) but instead
+    # iterate closer to it.
+
+    # Newton's method starts at any position on the θ axis, which we name θ0.
+    # We find the tangent value at f(θ0) and find the value the tangent crosses the
+    # θ axis, which becomes θ1. The same process is repeated for every θt.
+    # Since the distance (Δ) between θt and θ(t+1) in the θ axis
+    # is always f(θt) / f'(θt) we can generalise the iterative process as:
+    # θ(t+1) = θt - (f(θt) / f'(θt))
+
+    # We can simplify our iterative process by using a Hessian matrix and finding the
+    # gradient vector of our loss function:
+    # θ(t+1) = θt - H^(-1) * ∇θJ,
+    # where ∇θJ is the partial differential for every weight in θ,
+    # and H contains the second order derivative of every combination of every weight in θ .
+    # in mathematical form,
+    # ∇θJ = 1/m * Σ((hθ(xi) - yi) * xi),
+    # H = 1/m * hθ(1 - hθ(xi)) * ((xi) * (xi)^T)
+
+    h = make_sigmoid(theta)
+    for _ in range(I):
+        H = (1/m) * ((h(1 - h(X)) * np.matmul(X, X.T))).sum()
+        V = (1/m) * ((h(X) - Y) * X).sum()
+        theta = theta - (np.linalg.inv(H) * V)
+        h = make_sigmoid(theta)
+
+    return theta
+
+
+'''
+references
+
+Rogers, Simon, and Mark Girolami. (2016). A First Course in Machine Learning, CRC Press LLC.
+[online] Available at https://ebookcentral-proquest-com.proxy.library.lincoln.ac.uk/lib/ulinc/reader.action?docID=4718644:
+    [0] = page 7
+    [2] = page 6
+    [3] = pages 9 - 12
+    [4] = pages 19 - 25
+
+Petra Bosilj. (September 26, 2023). Introduction to Machine Learning, University of Lincoln:
+[online] Available on Blackboard:
+    [1] = slide 26 (/30)
+
+Wikipedia. (2022). Vandermonde matrix.
+[online] Available at: https://en.wikipedia.org/wiki/Vandermonde_matrix#.
+    [5] = (top)
+
+Dr Christos Frantzidis. (October 3, 2023). Model selection & evaluation, University of Lincoln.
+[online] Available on Blackboard:
+    [6] = slides 17 - 25 (/26)
+
+Wikipedia. (2022). Coefficient of Determination
+[online] Available at: https://en.wikipedia.org/wiki/Coefficient_of_determination#Definitions:
+    [7] = (top)
+
+Saishruthi Swaminathan. Logistic Regression — Detailed Overview, towards data science.
+[online] Available at: https://towardsdatascience.com/logistic-regression-detailed-overview-46c4da4303bc
+    [8] = Simple Logistic Regression, Model
+    [9] = Python Implementation
+
+Paul Wilmott. (2019). Machine Learning — an applied mathematics introduction, panda ohana publishing.
+    [10] = p94, chapter 6: Regression Methods — section 4: Logistic Regression
+'''
